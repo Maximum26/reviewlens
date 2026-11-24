@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from reviewlens.llm import call_llm, parse_json
 from reviewlens.prompts import EXTRACT_SYSTEM, build_extract_user
-from reviewlens.schemas import Extraction
+from reviewlens.schemas import AspectItem, Extraction
 
 MAX_ATTEMPTS = 3
 
@@ -31,6 +31,15 @@ def check_quotes(data: Extraction, review: str) -> None:
             raise ValueError(f"Цитата '{a.quote}' відсутня в тексті")
 
 
+def merge_duplicates(data: Extraction) -> tuple[Extraction, int]:
+    """Склеює повторні пари (aspect, sentiment), лишаючи першу цитату. Повертає (результат, скільки склеєно)."""
+    seen: dict[tuple[str, str], AspectItem] = {}
+    for a in data.aspects:
+        seen.setdefault((a.aspect, a.sentiment), a)
+    merged = len(data.aspects) - len(seen)
+    return data.model_copy(update={"aspects": list(seen.values())}), merged
+
+
 def extract(review: str) -> tuple[Extraction, list[str]]:
     """Повертає результат і логи: що було не так на кожній невдалій спробі."""
     logs: list[str] = []
@@ -40,6 +49,9 @@ def extract(review: str) -> tuple[Extraction, list[str]]:
         try:
             data = Extraction(**parse_json(raw))
             check_quotes(data, review)
+            data, merged = merge_duplicates(data)
+            if merged:
+                logs.append(f"Склеєно повторні пари аспект+тональність: {merged}")
             return data, logs
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
             error = str(e)
