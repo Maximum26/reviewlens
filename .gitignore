@@ -1,7 +1,7 @@
-# Секрети
+# Секреты
 .env
 
-# Кеш результатів
+# Кеш результатов
 cache.json
 .cache/
 
@@ -11,12 +11,3 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
-
-# Локальний план проєкту (не в git)
-docs/ReviewLens_plan.md
-
-# Служебные файлы агента (не публикуются)
-.claude/
-CLAUDE.md
-STATUS.md
-TASKS.md
