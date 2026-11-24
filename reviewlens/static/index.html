@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReviewLens</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --card: #ffffff; --line: #e2e2dd;
+    --pos: #2e7d4f; --neg: #c0392b; --neu: #8a8a85; --accent: #2f5d8a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614; --fg: #ecebe6; --muted: #9a9a93; --card: #1f1f1c; --line: #33332f;
+      --pos: #5fbf86; --neg: #e57368; --neu: #a3a39c; --accent: #7fb0de;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614; --fg: #ecebe6; --muted: #9a9a93; --card: #1f1f1c; --line: #33332f;
+    --pos: #5fbf86; --neg: #e57368; --neu: #a3a39c; --accent: #7fb0de;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 8px 0 4px; }
+  h2 { font-size: 18px; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+            padding: 16px; margin-bottom: 20px; }
+  textarea { width: 100%; min-height: 110px; padding: 10px; font: inherit; color: var(--fg);
+             background: var(--bg); border: 1px solid var(--line); border-radius: 8px; resize: vertical; }
+  button { font: inherit; padding: 9px 16px; border: 0; border-radius: 8px; cursor: pointer;
+           background: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type="file"] { font: inherit; color: var(--fg); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+  .muted { color: var(--muted); }
+  .error { color: var(--neg); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line);
+           font-size: 13px; }
+  .warn { color: var(--neg); font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  .sent-positive { color: var(--pos); font-weight: 600; }
+  .sent-negative { color: var(--neg); font-weight: 600; }
+  .sent-neutral { color: var(--neu); font-weight: 600; }
+  pre { white-space: pre-wrap; word-break: break-word; background: var(--bg); padding: 10px;
+        border-radius: 8px; border: 1px solid var(--line); font-size: 13px; margin: 8px 0 0; }
+  details summary { cursor: pointer; color: var(--muted); margin-top: 10px; }
+  .reply { background: var(--bg); border-radius: 8px; padding: 10px; white-space: pre-wrap; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 12px 0; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+  .stat b { display: block; font-size: 22px; }
+  .charts { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 720px) { .charts { grid-template-columns: 1fr; } }
+  .problem { border-top: 1px solid var(--line); padding: 10px 0; }
+  .problem:first-child { border-top: 0; }
+  blockquote { margin: 6px 0 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+  ul { padding-left: 20px; margin: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>ReviewLens</h1>
+  <p class="sub">Аспекти з тональністю, цитати-докази та зведення по відгуках.</p>
+
+  <section id="single-section">
+    <h2>Один відгук</h2>
+    <textarea id="review-text" placeholder="Вставте текст відгуку..."></textarea>
+    <div class="row">
+      <button id="analyze-btn" type="button">Аналізувати</button>
+      <span id="single-status" class="muted"></span>
+    </div>
+    <div id="single-out"></div>
+  </section>
+
+  <section id="dashboard-section">
+    <h2>Дашборд по CSV</h2>
+    <p class="muted">CSV має містити колонку <code>text</code>, необов'язково <code>id</code>. Обробляється до 50 рядків.</p>
+    <div class="row">
+      <input id="csv-file" type="file" accept=".csv,text/csv">
+      <button id="dash-btn" type="button">Побудувати дашборд</button>
+    </div>
+    <div class="row"><span id="dash-status" class="muted"></span></div>
+    <div id="dash-out"></div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  const ROUTE_LABELS = { spam: "спам", escalate: "ескалація", positive: "позитивний", full: "повний аналіз" };
+  const SENT_LABELS = { positive: "позитив", negative: "негатив", neutral: "нейтрал" };
+  const SENTIMENTS = ["positive", "negative", "neutral"];
+  const ASPECT_LABELS = {
+    food: "їжа", service: "сервіс", price: "ціна", speed: "швидкість", atmosphere: "атмосфера",
+    quality: "якість", delivery: "доставка", other: "інше",
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  // Будуємо DOM через textContent, щоб текст відгуків не інтерпретувався як HTML.
+  function el(tag, props = {}, children = []) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else node.setAttribute(key, value);
+    }
+    for (const child of children) if (child) node.append(child);
+    return node;
+  }
+
+  function errorMessage(data, status) {
+    const detail = data && data.detail;
+    if (typeof detail === "string") return detail;
+    if (detail) return JSON.stringify(detail);
+    return `Помилка сервера (${status})`;
+  }
+
+  async function readResponse(res) {
+    let data = null;
+    try { data = await res.json(); } catch (_) { /* відповідь без JSON */ }
+    if (!res.ok) throw new Error(errorMessage(data, res.status));
+    return data;
+  }
+
+  const aspectLabel = (a) => ASPECT_LABELS[a] || a;
+  const sentLabel = (s) => SENT_LABELS[s] || s;
+  const routeLabel = (r) => ROUTE_LABELS[r] || r;
+
+  // ---------- Один відгук: POST /analyze ----------
+
+  function renderSingle(data) {
+    const out = $("single-out");
+    const ext = data.extraction;
+
+    const head = el("div", { class: "row" }, [
+      el("span", { class: "badge", text: `Маршрут: ${routeLabel(data.route)}` }),
+      data.needs_human ? el("span", { class: "warn", text: "Потрібна перевірка людиною" }) : null,
+      el("span", { class: "muted", text: `Ітерацій критика: ${data.iterations}` }),
+    ]);
+
+    let aspects;
+    if (!ext || !ext.aspects.length) {
+      aspects = el("p", { class: "muted", text: "Аспекти не витягнуто." });
+    } else {
+      const tbody = el("tbody");
+      for (const a of ext.aspects) {
+        tbody.append(el("tr", {}, [
+          el("td", { text: aspectLabel(a.aspect) }),
+          el("td", { class: `sent-${a.sentiment}`, text: sentLabel(a.sentiment) }),
+          el("td", { text: `«${a.quote}»` }),
+        ]));
+      }
+      aspects = el("table", {}, [
+        el("thead", {}, [el("tr", {}, [
+          el("th", { text: "Аспект" }), el("th", { text: "Тональність" }), el("th", { text: "Цитата" }),
+        ])]),
+        tbody,
+      ]);
+    }
+
+    const meta = ext
+      ? el("p", { class: "muted", text: `Терміновість: ${ext.urgency}. Мова: ${ext.language}.` })
+      : null;
+
+    const reply = el("div", { class: "reply", text: data.reply
+      || "Відповідь не згенерована (спам, ескалація або збій LLM)." });
+
+    const logs = el("details", {}, [
+      el("summary", { text: `Лог (${data.logs.length})` }),
+      el("pre", { text: data.logs.join("\n") || "порожньо" }),
+    ]);
+
+    out.replaceChildren(head, meta, el("h3", { text: "Аспекти" }), aspects,
+      el("h3", { text: "Чернетка відповіді" }), reply, logs);
+  }
+
+  async function analyze() {
+    const text = $("review-text").value;
+    const btn = $("analyze-btn");
+    if (!text.trim()) {
+      $("single-status").textContent = "Введіть текст відгуку.";
+      return;
+    }
+    btn.disabled = true;
+    $("single-status").textContent = "Аналізую...";
+    try {
+      const res = await fetch("/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      renderSingle(await readResponse(res));
+      $("single-status").textContent = "";
+    } catch (e) {
+      $("single-out").replaceChildren(el("p", { class: "error", text: e.message }));
+      $("single-status").textContent = "";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ---------- Дашборд: POST /dashboard ----------
+
+  let aspectsChart = null;
+  let routesChart = null;
+
+  function cssVar(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  function renderCharts(data) {
+    if (!window.Chart) return null;
+    const aspectNames = Object.keys(data.aspects);
+    const labels = aspectNames.map(aspectLabel);
+    const colors = { positive: cssVar("--pos"), negative: cssVar("--neg"), neutral: cssVar("--neu") };
+    const text = cssVar("--fg");
+    const grid = cssVar("--line");
+
+    if (aspectsChart) aspectsChart.destroy();
+    if (routesChart) routesChart.destroy();
+
+    aspectsChart = new Chart($("aspects-chart"), {
+      type: "bar",
+      data: {
+        labels,
+        datasets: SENTIMENTS.map((s) => ({
+          label: sentLabel(s),
+          data: aspectNames.map((a) => data.aspects[a][s]),
+          backgroundColor: colors[s],
+        })),
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { stacked: true, ticks: { color: text }, grid: { color: grid } },
+          y: { stacked: true, beginAtZero: true, ticks: { color: text, precision: 0 }, grid: { color: grid } },
+        },
+        plugins: { legend: { labels: { color: text } } },
+      },
+    });
+
+    const routeNames = Object.keys(data.routes);
+    routesChart = new Chart($("routes-chart"), {
+      type: "doughnut",
+      data: {
+        labels: routeNames.map(routeLabel),
+        datasets: [{
+          data: routeNames.map((r) => data.routes[r]),
+          backgroundColor: [cssVar("--accent"), cssVar("--pos"), cssVar("--neg"), cssVar("--neu")],
+        }],
+      },
+      options: { responsive: true, plugins: { legend: { labels: { color: text } } } },
+    });
+    return true;
+  }
+
+  function renderDashboard(data) {
+    const processed = data.rows.length + data.errors.length;
+
+    const stats = el("div", { class: "stats" }, [
+      statTile("Оброблено", processed),
+      statTile("Потребують людини", data.needs_human_count),
+      statTile("Ретраї екстрактора", data.retry_count),
+      statTile("Помилки", data.errors.length),
+    ]);
+
+    const notes = [];
+    if (data.truncated) {
+      notes.push(el("p", { class: "warn", text: "У файлі більше рядків, ніж ліміт сервера. Оброблено лише перші відгуки." }));
+    }
+
+    const chartsWrap = el("div", { class: "charts" }, [
+      el("div", {}, [el("h3", { text: "Аспекти за тональністю" }), el("canvas", { id: "aspects-chart" })]),
+      el("div", {}, [el("h3", { text: "Маршрути" }), el("canvas", { id: "routes-chart" })]),
+    ]);
+
+    const problems = data.top_problems.length
+      ? data.top_problems.map((p) => el("div", { class: "problem" }, [
+          el("strong", { text: `${aspectLabel(p.aspect)} — негативних: ${p.negative_count}` }),
+          ...p.quotes.map((q) => el("blockquote", { text: `«${q}»` })),
+        ]))
+      : [el("p", { class: "muted", text: "Негативних аспектів не знайдено." })];
+
+    const insights = el("div", { class: "reply", text: data.insights && data.insights.summary
+      ? data.insights.summary : "Інсайти недоступні." });
+
+    const errors = data.errors.length
+      ? el("details", {}, [
+          el("summary", { text: `Помилки обробки (${data.errors.length})` }),
+          el("ul", {}, data.errors.map((e) => el("li", { text: `id ${e.id}: ${e.error}` }))),
+        ])
+      : null;
+
+    $("dash-out").replaceChildren(
+      ...notes, stats, chartsWrap,
+      el("h3", { text: "Топ проблем" }), ...problems,
+      el("h3", { text: "Інсайти" }), insights,
+      errors,
+    );
+
+    if (!renderCharts(data)) {
+      $("dash-status").textContent = "Chart.js не завантажився (потрібен доступ до CDN). Таблиці та інсайти показані.";
+    }
+  }
+
+  function statTile(label, value) {
+    return el("div", { class: "stat" }, [el("span", { class: "muted", text: label }), el("b", { text: String(value) })]);
+  }
+
+  async function buildDashboard() {
+    const file = $("csv-file").files[0];
+    const btn = $("dash-btn");
+    if (!file) {
+      $("dash-status").textContent = "Оберіть CSV-файл.";
+      return;
+    }
+    btn.disabled = true;
+    $("dash-status").textContent = "Обробляю... це може тривати кілька хвилин.";
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/dashboard", { method: "POST", body: fd });
+      renderDashboard(await readResponse(res));
+      $("dash-status").textContent = "";
+    } catch (e) {
+      $("dash-out").replaceChildren(el("p", { class: "error", text: e.message }));
+      $("dash-status").textContent = "";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  $("analyze-btn").addEventListener("click", analyze);
+  $("dash-btn").addEventListener("click", buildDashboard);
+})();
+</script>
+</body>
+</html>
