@@ -1,0 +1,13 @@
+# Секрети
+.env
+
+# Кеш результатів
+cache.json
+.cache/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
