@@ -10,13 +10,11 @@
 flowchart TD
     A[Відгук] --> R{Router}
     R -->|spam| S[Ігнор]
-    R -->|escalate| H[Людині, без автовідповіді]
-    R -->|positive| T[Коротка подяка]
-    R -->|full| E[Extractor]
-    R -->|positive| E
-    R -->|escalate| E
+    R -->|positive, escalate, full| E[Extractor]
     E --> V[Validator: схема, цитата в оригіналі, дублі]
     V -->|помилка: retry до 3 спроб| E
+    V -->|positive| T[Коротка подяка]
+    V -->|escalate| H[Людині, без автовідповіді]
     V -->|full| W[Reply writer]
     W --> C{Critic}
     C -->|не схвалено: до 2 переписувань| W
@@ -69,7 +67,7 @@ python eval/run_eval.py                        # реальний запуск �
 Оцінка на 22 розмічених відгуках (`eval/results.md`, v1 у `eval/results_v1.md`).
 
 - **Router accuracy:** маршрут збігся з gold, усі 22 відгуки.
-- **Aspect precision / recall:** пари (aspect, sentiment), лише немспам-відгуки gold (21); пари рахуються мультимножиною, тож дубль аспекту (id 13) не губиться.
+- **Aspect precision / recall:** пари (aspect, sentiment), лише неспам-відгуки gold (21); пари рахуються мультимножиною, тож дубль аспекту (id 13) не губиться.
 - **Sentiment accuracy:** серед аспектів, знайдених за назвою, частка з правильною тональністю.
 - **Validation retry rate:** частка відгуків, що дійшли до extractor (маршрут не spam), у яких була хоча б одна невдала спроба.
 - **Quote validity:** частка відгуків, де перша відповідь extractor не містила цитати, якої немає в тексті (знаменник той самий).
