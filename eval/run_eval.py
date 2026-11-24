@@ -36,8 +36,8 @@ class Metrics:
     router_ok: int = 0
     router_total: int = 0
     tp: int = 0             # пари (аспект, тональність) збіглися з gold
-    pred_pairs: int = 0     # усіх пар у прогнозі, немспам-відгуки
-    gold_pairs: int = 0     # усіх пар у gold, немспам-відгуки
+    pred_pairs: int = 0     # усіх пар у прогнозі, неспам-відгуки
+    gold_pairs: int = 0     # усіх пар у gold, неспам-відгуки
     sent_wrong: int = 0     # аспект знайдено за назвою, тональність не збіглася
     attempted: int = 0      # відгуки, що дійшли до extractor
     retried: int = 0        # з них із хоча б однією невдалою спробою
@@ -171,9 +171,9 @@ def render(report: Report, mode: str, api_calls: int | None, non_spam: int) -> s
         ("Router accuracy", _fmt_pct(m.router_ok, m.router_total),
          "маршрут збігся з gold, усі відгуки"),
         ("Aspect precision", _fmt_pct(m.tp, m.pred_pairs),
-         "пари (аспект, тональність), немспам-відгуки"),
+         "пари (аспект, тональність), неспам-відгуки"),
         ("Aspect recall", _fmt_pct(m.tp, m.gold_pairs),
-         "пари (аспект, тональність), немспам-відгуки"),
+         "пари (аспект, тональність), неспам-відгуки"),
         ("Sentiment accuracy", _fmt_pct(m.tp, m.tp + m.sent_wrong),
          "серед аспектів, знайдених за назвою"),
         ("Validation retry rate", _fmt_pct(m.retried, m.attempted),
@@ -187,7 +187,7 @@ def render(report: Report, mode: str, api_calls: int | None, non_spam: int) -> s
         "# Результати оцінки",
         "",
         f"Режим: **{mode}**. Дата: {today}. Модель: `{_MODEL}`. "
-        f"Відгуків: {m.router_total} (`data/gold.json`), немспам для aspect-метрик: {non_spam}.",
+        f"Відгуків: {m.router_total} (`data/gold.json`), неспам для aspect-метрик: {non_spam}.",
         "",
         "## Метрики",
         "",
