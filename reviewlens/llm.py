@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any
 
 import anthropic
 from dotenv import load_dotenv
@@ -14,6 +15,7 @@ _client: anthropic.Anthropic | None = None
 
 
 def _get_client() -> anthropic.Anthropic:
+    """Лінива ініціалізація клієнта Anthropic (один на процес)."""
     global _client
     if _client is None:
         if not os.getenv("ANTHROPIC_API_KEY"):
@@ -44,7 +46,7 @@ def call_llm(system: str, user: str) -> str:
     return text
 
 
-def parse_json(raw: str) -> dict:
+def parse_json(raw: str) -> dict[str, Any]:
     """Дістає JSON між першою { і останньою }."""
     start, end = raw.find("{"), raw.rfind("}")
     if start == -1 or end == -1:

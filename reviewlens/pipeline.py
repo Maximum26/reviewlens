@@ -17,6 +17,7 @@ class Result:
 
 
 def process(review: str) -> Result:
+    """Повний шлях відгуку: router -> extractor -> replier (залежно від маршруту)."""
     decision = route_review(review)
     logs = [f"Router: {decision.route}. {decision.reason}"]
 

@@ -16,19 +16,23 @@ from reviewlens.schemas import Critique, Extraction, Reply
 
 
 def thank_positive(review: str) -> Reply:
+    """Коротка подяка за позитивний відгук."""
     return Reply(**parse_json(call_llm(THANK_SYSTEM, review)))
 
 
 def write_reply(review: str, extraction: Extraction) -> Reply:
+    """Перша чернетка відповіді на основі витягнутих аспектів."""
     return Reply(**parse_json(call_llm(WRITER_SYSTEM, build_writer_user(review, extraction))))
 
 
 def critique(review: str, extraction: Extraction, reply: Reply) -> Critique:
+    """Критик перевіряє чернетку і повертає зауваження."""
     return Critique(**parse_json(call_llm(CRITIC_SYSTEM, build_critic_user(review, extraction, reply.reply))))
 
 
-def rewrite(review: str, extraction: Extraction, reply: Reply, critique: Critique) -> Reply:
-    user = build_rewrite_user(review, extraction, reply.reply, critique.issues)
+def rewrite(review: str, extraction: Extraction, reply: Reply, verdict: Critique) -> Reply:
+    """Переписує чернетку з урахуванням зауважень критика."""
+    user = build_rewrite_user(review, extraction, reply.reply, verdict.issues)
     return Reply(**parse_json(call_llm(REWRITE_SYSTEM, user)))
 
 

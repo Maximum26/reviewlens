@@ -29,8 +29,10 @@ class Critique(BaseModel):
     ok: bool
     issues: list[str]  # напр. "обіцяє повернення коштів", "не згадує аспект speed"
 
+
 class Reply(BaseModel):
     reply: str = Field(min_length=10)
+
 
 class Insights(BaseModel):
     summary: str = Field(min_length=10)

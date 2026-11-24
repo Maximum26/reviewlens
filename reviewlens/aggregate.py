@@ -31,6 +31,7 @@ def result_to_dict(result: Result) -> dict[str, Any]:
 
 
 def _has_extract_retry(logs: list[str]) -> bool:
+    """True, якщо в логах є слід ретраю екстрактора."""
     return any(_EXTRACT_RETRY_LINE.search(line) for line in logs)
 
 

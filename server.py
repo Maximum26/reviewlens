@@ -1,3 +1,5 @@
+from typing import Any
+
 import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
@@ -13,10 +15,12 @@ app = FastAPI(title="ReviewLens")
 
 
 class ReviewIn(BaseModel):
+    """Тіло запиту /analyze."""
+
     text: str
 
 
-def _row_id(value, row_number: int):
+def _row_id(value: str | None, row_number: int) -> str | int:
     """id з колонки id (рядок, читається з dtype=str), якщо є і не порожній; інакше номер рядка."""
     if value is None or pd.isna(value):
         return row_number
@@ -24,14 +28,16 @@ def _row_id(value, row_number: int):
 
 
 @app.post("/analyze")
-def analyze(body: ReviewIn):
+def analyze(body: ReviewIn) -> dict[str, Any]:
+    """Аналіз одного відгуку."""
     if not body.text.strip():
         raise HTTPException(status_code=400, detail="Порожній текст відгуку")
     return result_to_dict(process(body.text))
 
 
 @app.post("/dashboard")
-def dashboard(file: UploadFile):
+def dashboard(file: UploadFile) -> dict[str, Any]:
+    """Аналіз CSV з відгуками: пайплайн по кожному рядку, агрегація та інсайти."""
     try:
         # id читаємо як рядок: інакше pandas з пропусками робить його float (10 → 10.0)
         df = pd.read_csv(file.file, encoding="utf-8-sig", dtype={"id": str})
@@ -51,7 +57,8 @@ def dashboard(file: UploadFile):
     df = df.head(MAX_ROWS)
 
     has_id = "id" in df.columns
-    rows, errors = [], []
+    rows: list[tuple[str | int, str, dict[str, Any]]] = []
+    errors: list[dict[str, Any]] = []
     for idx, row in df.iterrows():
         rid = _row_id(row["id"] if has_id else None, int(idx) + 1)
         text = str(row["text"])

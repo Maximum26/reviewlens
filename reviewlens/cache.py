@@ -10,7 +10,9 @@ def make_key(model: str, system: str, user: str, max_tokens: int) -> str:
     raw = json.dumps([model, system, user, max_tokens], ensure_ascii=False)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
+
 def get(key: str) -> str | None:
+    """Повертає закешовану відповідь або None, якщо запису немає чи він пошкоджений."""
     path = CACHE_DIR / f"{key}.json"
     if not path.exists():
         return None
@@ -22,6 +24,7 @@ def get(key: str) -> str | None:
 
 
 def put(key: str, response: str) -> None:
+    """Зберігає відповідь LLM у файл кешу."""
     CACHE_DIR.mkdir(exist_ok=True)
     path = CACHE_DIR / f"{key}.json"
     path.write_text(json.dumps({"response": response}, ensure_ascii=False), encoding="utf-8")
